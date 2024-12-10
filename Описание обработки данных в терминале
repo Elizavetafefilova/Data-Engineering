@@ -1,0 +1,87 @@
+# Загружаем данные транскриптомов бактерий с возможными мутациями 
+conda install -c bioconda -c conda-forge sra-tools prefetch SRR8126636
+conda install -c bioconda -c conda-forge sra-tools prefetch SRR8126639 
+conda install -c bioconda -c conda-forge sra-tools prefetch SRR8126646 
+conda install -c bioconda -c conda-forge sra-tools prefetch SRR8126659
+conda install -c bioconda -c conda-forge sra-tools prefetch SRR8126666 
+conda install -c bioconda -c conda-forge sra-tools prefetch SRR8126671 
+
+# Разархивирование ридов в fastq формат
+fastq-dump --split-files --gzip SRR8126636
+fastq-dump --split-files --gzip SRR8126639
+fastq-dump --split-files --gzip SRR8126646
+fastq-dump --split-files --gzip SRR8126659
+fastq-dump --split-files --gzip SRR8126666
+fastq-dump --split-files --gzip SRR8126671
+
+# Проверка качетства прямого и обратного прочтения транскриптомов
+fastqc SRR8126636_1.fastq.gz SRR8126636_2.fastq.gz -o /root/Data-Engineering/fastq_results 
+fastqc SRR8126639_1.fastq.gz SRR8126639_2.fastq.gz -o /root/Data-Engineering/fastq_results 
+fastqc SRR8126646_1.fastq.gz SRR8126646_2.fastq.gz -o /root/Data-Engineering/fastq_results 
+fastqc SRR8126659_1.fastq.gz SRR8126659_2.fastq.gz -o /root/Data-Engineering/fastq_results 
+fastqc SRR8126666_1.fastq.gz SRR8126666_2.fastq.gz -o /root/Data-Engineering/fastq_results 
+fastqc SRR8126671_1.fastq.gz SRR8126671_2.fastq.gz -o /root/Data-Engineering/fastq_results
+
+# Судя по графикам анализа сырых данных необходимо обрезать риды, производим обрезку при помощи Trimmonatic
+java -jar /home/tools/Trimmomatic-0.39/trimmomatic-0.39.jar PE  SRR8126636_1.fastq SRR8126636_2.fastq -baseout SRR8126636.results CROP:74 HEADCROP:13 
+java -jar /home/tools/Trimmomatic-0.39/trimmomatic-0.39.jar PE  SRR8126639_1.fastq SRR8126639_2.fastq -baseout SRR8126636.results CROP:74 HEADCROP:13
+java -jar /home/tools/Trimmomatic-0.39/trimmomatic-0.39.jar PE  SRR8126646_1.fastq SRR8126646_2.fastq -baseout SRR8126636.results CROP:74 HEADCROP:13
+java -jar /home/tools/Trimmomatic-0.39/trimmomatic-0.39.jar PE  SRR8126659_1.fastq SRR8126659_2.fastq -baseout SRR8126636.results CROP:74 HEADCROP:13
+java -jar /home/tools/Trimmomatic-0.39/trimmomatic-0.39.jar PE  SRR8126666_1.fastq SRR8126666_2.fastq -baseout SRR8126636.results CROP:74 HEADCROP:13
+java -jar /home/tools/Trimmomatic-0.39/trimmomatic-0.39.jar PE  SRR8126671_1.fastq SRR8126671_2.fastq -baseout SRR8126636.results CROP:74 HEADCROP:13
+
+# Загружаем исзрдный геном бактерии S.cerevisiae и выравниваем трансриптомы по исходному геному
+cp GCF_000146045.2_R64_genomic.fna
+bwa index GCF_000146045.2_R64_genomic.fna
+bwa mem GCF_000146045.2_R64_genomic.fna SRR8126636.results_1P SRR8126636.results_2P > SRR8126636.sam
+bwa mem GCF_000146045.2_R64_genomic.fna SRR8126639.results_1P SRR8126639.results_2P > SRR8126639.sam
+bwa mem GCF_000146045.2_R64_genomic.fna SRR8126646.results_1P SRR8126646.results_2P > SRR8126646.sam
+bwa mem GCF_000146045.2_R64_genomic.fna SRR8126659.results_1P SRR8126659.results_2P > SRR8126646.sam
+bwa mem GCF_000146045.2_R64_genomic.fna SRR8126666.results_1P SRR8126666.results_2P > SRR8126666.sam
+bwa mem GCF_000146045.2_R64_genomic.fna SRR8126671.results_1P SRR8126671.results_2P > SRR8126671.sam
+
+# Фильтруем и оставляем в каждом из транскриптомов только данные с параметром качества MQUAL больше 10
+samtools view -S -h -q 10 SRR8126636.sam > SRR8126636.FILTER.sam                                                                                        
+samtools view -S -h -q 10 SRR8126639.sam > SRR8126639.FILTER.sam                                                                                        
+samtools view -S -h -q 10 SRR8126646.sam > SRR8126646.FILTER.sam                                                                                        
+samtools view -S -h -q 10 SRR8126659.sam > SRR8126659.FILTER.sam                                                                                        
+samtools view -S -h -q 10 SRR8126666.sam > SRR8126666.FILTER.sam         
+samtools view -S -h -q 10 SRR8126671.sam > SRR8126671.FILTER.sam   
+
+# Перевод файлов в bam формат и их сортировка для верного порядка чтений
+samtools view -S -b SRR8126636.FILTER.sam > SRR8126636.unsort.bam
+samtools view -S -b SRR8126639.FILTER.sam > SRR8126639.unsort.bam
+samtools view -S -b SRR8126646.FILTER.sam > SRR8126646.unsort.bam
+samtools view -S -b SRR8126659.FILTER.sam > SRR8126659.unsort.bam
+samtools view -S -b SRR8126666.FILTER.sam > SRR8126666.unsort.bam
+samtools view -S -b SRR8126671.FILTER.sam > SRR8126671.unsort.bam
+
+samtools sort SRR8126636.sort.bam -o SRR8126636.bam
+samtools sort SRR8126639.sort.bam -o SRR8126639.bam
+samtools sort SRR8126646.sort.bam -o SRR8126646.bam
+samtools sort SRR8126659.sort.bam -o SRR8126659.bam
+samtools sort SRR8126666.sort.bam -o SRR8126666.bam
+samtools sort SRR8126671.sort.bam -o SRR8126671.bam
+
+# Индексация транскриптомов для более быстрого доступа к данным
+samtools index SRR8126636.bam    
+samtools index SRR8126639.bam    
+samtools index SRR8126646.bam    
+samtools index SRR8126659.bam    
+samtools index SRR8126666.bam    
+samtools index SRR8126671.bam    
+
+# Расxtn покрытия CDS генома дрожжей прочтениями с помощью htseq
+htseq-count --format=bam --stranded=yes --type=CDS --order=pos --idattr=ID SRR8126636.bam GCF_000146045.2_R64_genomic.gff > SRR8126636count.txt
+htseq-count --format=bam --stranded=yes --type=CDS --order=pos --idattr=ID SRR8126639.bam GCF_000146045.2_R64_genomic.gff  > SRR8126639count.txt
+htseq-count --format=bam --stranded=yes --type=CDS --order=pos --idattr=ID SRR8126646.bam GCF_000146045.2_R64_genomic.gff  > >SRR8126646count.txt
+htseq-count --format=bam --stranded=yes --type=CDS --order=pos --idattr=ID SRR8126659.bam GCF_000146045.2_R64_genomic.gff  > SRR8126659count.txt
+htseq-count --format=bam --stranded=yes --type=CDS --order=pos --idattr=ID SRR8126666.bam GCF_000146045.2_R64_genomic.gff  > SRR8126666count.txt
+htseq-count --format=bam --stranded=yes --type=CDS --order=pos --idattr=ID SRR8126671.bam GCF_000146045.2_R64_genomic.gff  >SRR8126671count.txt
+
+# Дальнейший сбор данных в единую таблицу и их статистическая обработка в R.script
+
+
+
+
+
